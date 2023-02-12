@@ -1,5 +1,6 @@
 /*** includes ***/
 /* clone of the kilo text editor written in C */
+/* using mostly VT100 escape sequences */
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -7,10 +8,17 @@
 #include <termios.h>
 #include <unistd.h>
 
+/*** defined ***/
+
+#define CTRL_KEY(k) ((k) & 0x1f)
+
 /*** data ***/
 struct termios orig_termios;
 
 void die(const char *s) {
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  write(STDOUT_FILENO, "\x1b[H", 3);
+
   perror(s);
   exit(1);
 }
@@ -18,7 +26,7 @@ void die(const char *s) {
 /*** terminal ***/
 
 void disableRawMode() {
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) ==-1)
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
     die("tcsetattr");
 }
 
@@ -68,21 +76,60 @@ void enableRawMode() {
     die("tcsetattr");
 }
 
+char editorReadKey() {
+  int nread;
+  char c;
+  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+    if (nread == -1 && errno != EAGAIN) die("read");
+  }
+  return c;
+}
+
+/*** outputs ***/
+
+void editorDrawRows() {
+  int y;
+  for (y = 0; y < 24; y++) {
+    write(STDOUT_FILENO, "~\r\n", 3);
+  }
+}
+
+void editorRefreshScreen() {
+  /* writing 4 btyes, escape \x1b and the three bytes [2J
+    [: always the next char in an escape sequence
+    J: clears the screen (Erase in Display)
+    2: clear the entire screen
+  */
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  /* reposition the cursor */
+  write(STDOUT_FILENO, "\x1b[H", 3);
+
+  editorDrawRows();
+  write(STDOUT_FILENO, "\x1b[H", 3);
+}
+
+/*** inputs ***/
+
+void editorProcessKeypress() {
+  char c = editorReadKey();
+
+  switch (c) {
+    case CTRL_KEY('q'):
+      write(STDOUT_FILENO, "\x1b[2J", 4);
+      write(STDOUT_FILENO, "\x1b[H", 3);
+      exit(0);
+      break;
+  }
+}
+
 /*** init ***/
 
 int main() {
   enableRawMode();
 
   while(1) {
-    char c = '\0';
-    /* when read times out on cygwin, -1 is returned with errno EAGAIN */
-    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die("read");
-    if (iscntrl(c)) {
-      printf("%d\r\n", c);
-    } else {
-      printf("%d ('%c')\r\n", c, c);
-    }
-    if (c == 'q') break;
+    editorRefreshScreen();
+    editorProcessKeypress();
   }
 
   return 0;
