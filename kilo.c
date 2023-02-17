@@ -412,8 +412,8 @@ void editorSelectSyntaxHighlight() {
     unsigned int i = 0;
     while (s->filematch[i]) {
       int is_ext = (s->filematch[i][0] == '.');
-            if ((is_ext && ext && !strcmp(ext, s->filematch[i])) ||
-          (!is_ext && strstr(E.filename, s->filematch[i]))) {
+      if ((is_ext && ext && !strcmp(ext, s->filematch[i])) ||
+        (!is_ext && strstr(E.filename, s->filematch[i]))) {
         E.syntax = s;
 
         int filerow;
@@ -573,15 +573,15 @@ void editorDelChar() {
   if (E.cx == 0 && E.cy == 0) return;
 
   erow *row = &E.row[E.cy];
+
   if (E.cx > 0) {
-    editorRowDelChar(row, E.cx - 1);
-    E.cx--;
-  } else {
-    E.cx = E.row[E.cy - 1].size;
-    editorRowAppendString(&E.row[E.cy - 1], row->chars, row->size);
-    editorDelRow(E.cy);
-    E.cy--;
+    editorRowDelChar(row, --E.cx);
+    return;
   }
+
+  E.cx = E.row[--E.cy].size;
+  editorRowAppendString(&E.row[E.cy], row->chars, row->size);
+  editorDelRow(E.cy);
 }
 
 void *editorRowsToString(int *buflen) {
